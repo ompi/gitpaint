@@ -1,0 +1,83 @@
+#!/bin/sh
+
+# TODO https://docs.gitlab.com/ee/api/repository_files.html
+
+FONT_WIDTH=3
+
+msg() {
+  echo "gitpaint: $@" >&2
+}
+
+font_as_a_service() {
+  curl "http://www.network-science.de/ascii/ascii.php?TEXT=${1}&x=31&y=16&FONT=3x5&RICH=no&FORM=left&STRE=no&WIDT=80" 2> /dev/null |
+      sed -n '/<TR><TD><PRE>/,$p' | tail -n+2
+}
+
+get_character() {
+  font_as_a_service $1
+}
+
+get_line() {
+  line_num=$(( $2 + 1 ))
+  get_character $1 | sed "${line_num}!d"
+}
+
+get_pixel() {
+  get_line $1 $3 | sed "s#.\{$2\}\(.\).*#\1#"
+}
+
+check_start_date() {
+  if [ `date -d $1 +%w` != 0 ]; then
+    msg "Start date should be a Sunday."
+    exit 1
+  fi
+}
+
+get_day_offset() {
+  start=`date -d $1 +%s`
+  now=`date +%s`
+#  offset=$(( ${now} - ${start} ))
+#  echo $(( offset / 86400 ))
+  echo $TEST
+}
+
+poke_git() {
+  echo commit
+}
+
+do_nothing() {
+  msg "Nothing to do today."
+}
+
+doit() {
+  offset=`get_day_offset $2`
+
+  if [ ${offset} -lt 0 ]; then
+    do_nothing
+    return
+  fi
+
+  week=$(( offset / 7 ))
+  day_of_week=$(( offset % 7 ))
+
+  char_num=$(( (${week} / (FONT_WIDTH + 1) % `expr length $1` ) + 1 ))
+  pos_x=$(( ${week} % (FONT_WIDTH + 1) ))
+
+  if [ "${day_of_week}" == 0 ]  || [ "${day_of_week}" == 6 ] || [ "${pos_x}" == 3 ]; then
+    do_nothing
+    return
+  fi
+
+  pos_y=$(( ${day_of_week} - 1 ))
+  char=`expr substr $1 ${char_num} 1`
+
+  if [ "`get_pixel ${char} ${pos_x} ${pos_y}`" != '#' ]; then
+    do_nothing
+    return
+  fi
+
+  poke_git
+}
+
+check_start_date $2
+doit $@
