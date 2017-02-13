@@ -3,9 +3,30 @@
 # TODO https://docs.gitlab.com/ee/api/repository_files.html
 
 FONT_WIDTH=3
+GITPAINT_CFG=${HOME}/.gitpaint
 
 msg() {
   echo "gitpaint: $@" >&2
+}
+
+check_config() {
+  if [ ! -f "${GITPAINT_CFG}" ]; then
+    msg "Config file ${GITPAINT_CFG} was not found."
+    cat <<- EOF > ${GITPAINT_CFG}
+	# gitpaint configuration file
+
+	gitlab_url=""
+	gitlab_project_id=""
+	private_token=""
+	file_to_poke="README.md"
+	branch_name="master"
+	EOF
+    chmod 600 ${GITPAINT_CFG}
+    msg "Default config file was created."
+    msg "Please edit ${GITPAINT_CFG} to get gitpaint working."
+  fi
+
+  . ${GITPAINT_CFG}
 }
 
 font_as_a_service() {
@@ -36,13 +57,18 @@ check_start_date() {
 get_day_offset() {
   start=`date -d $1 +%s`
   now=`date +%s`
-#  offset=$(( ${now} - ${start} ))
-#  echo $(( offset / 86400 ))
-  echo $TEST
+  offset=$(( ${now} - ${start} ))
+  echo $(( offset / 86400 ))
 }
 
-poke_git() {
-  echo commit
+poke_git_repo() {
+  content="%23%20Today%27s%20lucky%20number%20is%20${RANDOM}."
+  commit_message="Updated%20lucky%20number."
+
+  curl --request PUT \
+       --header "PRIVATE-TOKEN: ${private_token}" \
+       "${gitlab_url}/api/v3/projects/${gitlab_project_id}/repository/files?file_path=${file_to_poke}&branch_name=${branch_name}&content=${content}&commit_message=${commit_message}"
+  msg "Repo poked."
 }
 
 do_nothing() {
@@ -76,8 +102,9 @@ doit() {
     return
   fi
 
-  poke_git
+  poke_git_repo
 }
 
+check_config
 check_start_date $2
 doit $@
