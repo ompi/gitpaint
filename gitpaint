@@ -62,12 +62,29 @@ get_day_offset() {
 }
 
 poke_git_repo() {
-  content="%23%20Today%27s%20lucky%20number%20is%20${RANDOM}."
-  commit_message="Updated%20lucky%20number."
+  content="# Today's lucky number is ${RANDOM}."
+  commit_message="Updated lucky number."
 
-  curl --request PUT \
+  payload=$(cat <<- JSON
+	{
+	  "branch": "${branch_name}",
+	  "commit_message": "${commit_message}",
+	  "actions": [
+	    {
+	      "action": "update",
+	      "file_path": "${file_to_poke}",
+	      "content": "${content}"
+	    }
+	  ]
+	}
+	JSON
+  )
+
+  curl --request POST \
        --header "PRIVATE-TOKEN: ${private_token}" \
-       "${gitlab_url}/api/v3/projects/${gitlab_project_id}/repository/files?file_path=${file_to_poke}&branch_name=${branch_name}&content=${content}&commit_message=${commit_message}"
+       --header "Content-Type: application/json" \
+       --data "$payload" \
+       "${gitlab_url}/api/v4/projects/${gitlab_project_id}/repository/commits"
   msg "Repo poked."
 }
 
